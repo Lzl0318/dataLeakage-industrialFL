@@ -1,6 +1,7 @@
 import random
 import argparse
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -46,8 +47,8 @@ def mi_face(label_index, model, num_iterations, gradient_step):
 
     # initialize two 33 tensors with zeros
 
-    tensor = ((torch.zeros(33)+torch.ones(33))/2).unsqueeze(0).to(device)
-    image = ((torch.zeros(33)+torch.ones(33))/2).unsqueeze(0).to(device)
+    tensor = ((torch.zeros(33)+torch.ones(33))/2+0.01*torch.randn(33)).unsqueeze(0).to(device)
+    image = ((torch.zeros(33)+torch.ones(33))/2+0.01*torch.randn(33)).unsqueeze(0).to(device)
 
     # initialize with infinity
     min_loss = float("inf")
@@ -88,33 +89,37 @@ def perform_attack_and_print_all_results(model, iterations):
     avg_cos = 0
 
     for j in range(22):
-        print('\nReconstructing Class ' + str(j + 1))
-        train_data_median = np.load('../data/TE/classify/train_data_median.npy')
-        original = train_data_median[j]
+        df = pd.DataFrame(index=range(600), columns=range(33))
+        for k in range(600):
+            print('\nReconstructing Class ' + str(j + 1))
+            # train_data_median = np.load('../data/TE/classify/train_data_median.npy')
+            # original = train_data_median[j]
 
-        # reconstruct respective class
-        reconstruction = mi_face(j, model, iterations, gradient_step_size)
-        reconstruction = reconstruction.squeeze().detach().numpy().reshape(-1, 1)
-        reconstruction = reconstruction.squeeze(1)
+            # reconstruct respective class
+            reconstruction = mi_face(j, model, iterations, gradient_step_size)
+            reconstruction = reconstruction.squeeze().detach().numpy().reshape(-1, 1)
+            reconstruction = reconstruction.squeeze(1)
+            df.loc[k, :] = reconstruction
+        df.to_csv('./results/mia/reverse_result_protected/600result_'+str(j)+'.csv')
 
-        print(original)
-        print(reconstruction)
+            # print(original)
+            # print(reconstruction)
 
-        # evaluation two vector
-        rmse = np.sqrt(mean_squared_error(original, reconstruction))
-        cos = 1 - spatial.distance.cosine(original, reconstruction)
+            # evaluation two vector
+            # rmse = np.sqrt(mean_squared_error(original, reconstruction))
+            # cos = 1 - spatial.distance.cosine(original, reconstruction)
+            #
+            # print('\nThe mean_squared_error is {}'.format(rmse))
+            # print('\nThe cosine_similarity is {}'.format(cos))
+            #
+            # avg_mse = (avg_mse + rmse)
+            # avg_cos = (avg_cos + cos)
 
-        print('\nThe mean_squared_error is {}'.format(rmse))
-        print('\nThe cosine_similarity is {}'.format(cos))
+            # np.save('./results/mia/reverse_result/' + str(j) + '.npy', reconstruction)
+        # np.save('./results/mia/reverse_result_protected/' + str(j) + '.npy', reconstruction)
 
-        avg_mse = (avg_mse + rmse)
-        avg_cos = (avg_cos + cos)
-
-        # np.save('./results/mia/reverse_result/' + str(j) + '.npy', reconstruction)
-        np.save('./results/mia/reverse_result_protected/' + str(j) + '.npy', reconstruction)
-
-    print('\nThe average mean_squared_error is {}'.format(avg_mse / 22))
-    print('\nThe average cosine_similarity is {}'.format(avg_cos / 22))
+    # print('\nThe average mean_squared_error is {}'.format(avg_mse / 22))
+    # print('\nThe average cosine_similarity is {}'.format(avg_cos / 22))
 
 
 model = MLP(33, 22).to(device)
@@ -158,17 +163,17 @@ model.load_state_dict(parameters)
 perform_attack_and_print_all_results(model, 30)
 
 # ---------------测试加噪声之后的模型的准确率---------------
-print('测试模型加噪声之后的分类性能')
-test_data = np.load('../data/TE/classify/test_data.npy')
-test_label = np.load('../data/TE/classify/test_label.npy').squeeze(1)
-test_data = torch.from_numpy(test_data).float()
-test_label = torch.from_numpy(test_label).float().type(torch.LongTensor)
-
-model.eval()
-model.cpu()
-pre = model(test_data)
-prediction = torch.max(F.softmax(pre), 1)[1]
-pred_y = prediction.data.numpy().squeeze()
-target_y = test_label.data.numpy()
-print('accuracy={:.4f}'.format(sum(pred_y == target_y) / 4400))
-print(F.softmax(model(test_data[4399])))
+# print('测试模型加噪声之后的分类性能')
+# test_data = np.load('../data/TE/classify/test_data.npy')
+# test_label = np.load('../data/TE/classify/test_label.npy').squeeze(1)
+# test_data = torch.from_numpy(test_data).float()
+# test_label = torch.from_numpy(test_label).float().type(torch.LongTensor)
+#
+# model.eval()
+# model.cpu()
+# pre = model(test_data)
+# prediction = torch.max(F.softmax(pre), 1)[1]
+# pred_y = prediction.data.numpy().squeeze()
+# target_y = test_label.data.numpy()
+# print('accuracy={:.4f}'.format(sum(pred_y == target_y) / 4400))
+# print(F.softmax(model(test_data[4399])))
